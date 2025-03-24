@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 use crate::{
     single_byte_xor::{self, BreakResult},
     utils,
@@ -5,7 +6,17 @@ use crate::{
 use anyhow::anyhow;
 use std::slice;
 
-fn keysize_scores(data: &[u8]) -> Vec<(u32, f32)> {
+// pub struct Key {
+//     key: Vec<u8>,
+// }
+//
+// impl From<u32, Vec<u8>> for Key {
+//     fn from(size: u32, key: Vec<u8>) -> Self {
+//         KEY { size, key }
+//     }
+// }
+//
+pub fn keysize_scores(data: &[u8]) -> Vec<(u32, f32)> {
     const MAX_KEYSIZE: u32 = 40;
     let mut results = Vec::new();
     for k in 2..MAX_KEYSIZE.min(data.len() as u32 / 2) {
@@ -32,7 +43,7 @@ fn keysize_scores(data: &[u8]) -> Vec<(u32, f32)> {
     results
 }
 
-fn find_best_keysize(data: &[u8], take_n: usize) -> Vec<u32> {
+pub fn find_best_keysize(data: &[u8], take_n: usize) -> Vec<u32> {
     fn sort_by_score(a: &(u32, f32), b: &(u32, f32)) -> std::cmp::Ordering {
         match a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal) {
             std::cmp::Ordering::Equal => a.0.cmp(&b.0),
@@ -46,36 +57,36 @@ fn find_best_keysize(data: &[u8], take_n: usize) -> Vec<u32> {
     best_keysizes
 }
 
-fn try_break(data: &[u8], keysize: Vec<u32>) -> Vec<(u32, Vec<u8>)> {
-    let mut keys: Vec<(u32, Vec<u8>)> = Vec::new();
-    for size in keysize {
-        let mut key: Vec<u8> = Vec::new();
-        for t in 0..size {
-            let mut bits: Vec<u8> = Vec::new();
-            for chunk in data.chunks_exact(size as usize) {
-                if let Some(byte) = chunk.get(t as usize) {
-                    bits.push(*byte);
-                }
-            }
-            let breakresult = single_byte_xor::try_break(&bits);
-            key.push(breakresult.unwrap().byte);
-        }
-        keys.push((size, key.clone()));
-    }
+pub fn try_break(data: &[u8], keysize: Vec<u32>) -> Vec<(u32, Vec<u8>)> {
+    let keys: Vec<(u32, Vec<u8>)> = keysize
+        .iter()
+        .map(|&size| {
+            let key: Vec<u8> = (0..size)
+                .map(|t| {
+                    let bits: Vec<u8> = data
+                        .chunks_exact(size as usize)
+                        .filter_map(|chunk| chunk.get(t as usize).cloned())
+                        .collect();
+                    single_byte_xor::try_break(&bits).unwrap().byte
+                })
+                .collect();
+            (size, key)
+        })
+        .collect();
     keys
 }
 
-fn try_break_encryption(data: &[u8], keys: Vec<(usize, &[u8])>) -> String {
-    let mut decrypted_list: Vec<(f32, &[u8])> = Vec::new();
-    for (_, key) in keys {
-        let result = utils::bytes_xor(data, key);
-        let score = utils::english_score_bytes(&result);
-        decrypted_list.push((score, &result));
-    }
-    decrypted_list.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-    let (_, decrypted_bytes) = decrypted_list.get(1).unwrap();
-    let decrypted = String::from_utf8_lossy(decrypted_bytes);
-    decrypted.to_string()
+pub fn try_break_encryption(data: &[u8], keys: Vec<(u32, Vec<u8>)>) -> String {
+    let mut decrypted_list: Vec<(f32, Vec<u8>)> = keys
+        .into_iter()
+        .map(|(_, key)| {
+            let result = utils::bytes_xor(data, &key);
+            let score = utils::english_score_bytes(&result);
+            (score, result)
+        })
+        .collect();
+    decrypted_list.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    String::from_utf8_lossy(decrypted_list.first().unwrap().1.as_ref()).to_string()
 }
 
 #[test]
@@ -148,30 +159,5 @@ fn find_keysize_test() -> Result<(), anyhow::Error> {
             ));
         }
     }
-    Ok(())
-}
-
-#[test]
-fn find_keysize_data_test() -> Result<(), anyhow::Error> {
-    const TAKE_N: usize = 3;
-    const FILE: &str = include_str!("../data/file_2.txt");
-    let trimmed = FILE.replace("\n", "");
-    let data = utils::base64_to_bytes(&trimmed)?;
-    let keysize = find_best_keysize(&data, TAKE_N);
-    println!("keysize: {:?}", keysize);
-    Ok(())
-}
-
-#[test]
-fn try_break_data_test() -> Result<(), anyhow::Error> {
-    const TAKE_N: usize = 3;
-    const FILE: &str = include_str!("../data/file_2.txt");
-    let trimmed = FILE.replace("\n", "");
-    let data = utils::base64_to_bytes(&trimmed)?;
-    let keysize = find_best_keysize(&data, TAKE_N);
-    let keys = try_break(&data, keysize);
-    println!("{:?}", keys);
-    let decrypted = try_break_encryption(&data, keys);
-    println!("decrypted: {:?}", decrypted);
     Ok(())
 }
