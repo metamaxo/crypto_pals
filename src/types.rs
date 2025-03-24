@@ -40,15 +40,6 @@ impl fmt::Display for MyBytes {
     }
 }
 
-impl FromStr for MyBytes {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(MyBytes {
-            bytes: s.as_bytes().to_owned(),
-        })
-    }
-}
-
 // generic implementations
 impl From<String> for MyBytes {
     fn from(data: String) -> Self {
