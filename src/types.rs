@@ -40,7 +40,6 @@ impl fmt::Display for MyBytes {
     }
 }
 
-// generic implementations
 impl From<String> for MyBytes {
     fn from(data: String) -> Self {
         MyBytes::from(data.as_str())
