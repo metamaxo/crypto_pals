@@ -1,72 +1,62 @@
 #![allow(dead_code, unused_imports)]
 mod types;
-use types::{Bytemap, MyBytes};
+use traits::{
+    BytesBase64Ext, BytesExt, BytesHexExt, BytesHexLinesExt as _, BytesStrExt,
+    BytesStrLinesExt as _,
+};
 mod repeated_xor;
 mod single_byte_xor;
+mod traits;
 mod utils;
 use ::anyhow::anyhow;
 use base64::{engine as _, engine::general_purpose};
 
-#[test]
-fn test_1() -> Result<(), anyhow::Error> {
+fn challenge_1() -> Result<(), anyhow::Error> {
     const INPUT: &str = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
     const EXPECTED: &str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
 
-    if MyBytes::from_hex(INPUT)?.to_base64() != EXPECTED {
+    if <Vec<u8>>::try_from_hex(INPUT)?.to_base64() != EXPECTED {
         return Err(anyhow!("unexpected result"));
     }
     Ok(())
 }
 
-#[test]
-fn test_2() -> Result<(), anyhow::Error> {
+fn challenge_2() -> Result<(), anyhow::Error> {
     const INPUT: &str = "1c0111001f010100061a024b53535009181c";
     const BUFFER: &str = "686974207468652062756c6c277320657965";
     const EXPECTED: &str = "746865206b696420646f6e277420706c6179";
 
-    let result = MyBytes::from(utils::bytes_xor(
-        &MyBytes::from_hex(INPUT)?,
-        &MyBytes::from_hex(BUFFER)?,
-    ))
+    let result = utils::bytes_xor(
+        &<Vec<u8>>::try_from_hex(INPUT)?,
+        &<Vec<u8>>::try_from_hex(BUFFER)?,
+    )
     .to_hex();
+
     if result != EXPECTED {
         return Err(anyhow!("unexpected result"));
     }
     Ok(())
 }
 
-#[test]
-fn test_3() -> Result<(), anyhow::Error> {
+fn challenge_3() -> Result<(), anyhow::Error> {
     const INPUT: &str = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
     const EXPECTED: u8 = 88;
     let result =
-        single_byte_xor::try_break(&MyBytes::from_hex(INPUT)?).ok_or(anyhow!("no result"))?;
+        single_byte_xor::try_break(&<Vec<u8>>::try_from_hex(INPUT)?).ok_or(anyhow!("no result"))?;
     if result.byte as u8 != EXPECTED {
         return Err(anyhow!("expected {} got {}", EXPECTED, result.byte));
     }
     Ok(())
 }
-fn parse_file_lines(input: &str) -> Result<Vec<Vec<u8>>, anyhow::Error> {
-    Ok(input
-        .lines()
-        .map(str::trim)
-        .map(hex::decode)
-        .collect::<Result<_, _>>()?)
-}
 
-#[test]
-fn test_4() -> Result<(), anyhow::Error> {
+fn challenge_4() -> Result<(), anyhow::Error> {
     const FILE: &str = include_str!("../data/file_1.txt");
     const EXPECTED: &str = "Now that the party is jumping\n";
-    let lines = parse_file_lines(FILE)?;
+    let lines = <Vec<Vec<u8>>>::try_from_hex(FILE)?;
 
     let Some((line, result)) = lines
         .iter()
-        .zip(
-            lines
-                .iter()
-                .map(|line| single_byte_xor::try_break(line.as_slice())),
-        )
+        .zip(lines.iter().map(|line| single_byte_xor::try_break(line)))
         .flat_map(|(line, result)| result.map(|result| (line, result)))
         .min_by(|(_, left_result), (_, right_result)| left_result.cmp(right_result))
     else {
@@ -81,32 +71,30 @@ fn test_4() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[test]
-fn test_5() -> Result<(), anyhow::Error> {
-    const FILE: &str = "Burning 'em, if you ain't quick and nimble
-I go crazy when I hear a cymbal";
-    const EXPECTED: &str =
-        "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272
-a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+fn challenge_5() -> Result<(), anyhow::Error> {
+    const FILE: &str =
+        "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal\n";
+    const EXPECTED: &str = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\na282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
     const KEY: &str = "ICE";
-    for (line, expected) in Bytemap::from(FILE)
-        .bytemap
-        .iter()
-        .zip(Bytemap::from_hex(EXPECTED).bytemap)
-    {
-        if utils::bytes_xor(&line, KEY.as_bytes()) != expected.bytes {
-            return Err(anyhow!("unexpected result"));
+
+    let file_lines = <Vec<Vec<u8>>>::from_str(FILE);
+    println!("file lines {:?}", file_lines);
+
+    let expected_lines = <Vec<Vec<u8>>>::try_from_hex(EXPECTED)?;
+    println!("expected lines {:?}", expected_lines);
+    for (line, expected) in file_lines.iter().zip(expected_lines.iter()) {
+        if utils::bytes_xor(line, KEY.as_bytes()) != *expected {
+            return Err(anyhow!("expected {:?} got {:?}", expected, line));
         }
     }
     Ok(())
 }
 
-#[test]
-fn test_6() -> Result<(), anyhow::Error> {
+fn challenge_6() -> Result<(), anyhow::Error> {
     const EXPECTED: u32 = 18;
     const TAKE_N: usize = 3;
     const FILE: &str = include_str!("../data/file_2.txt");
-    let data = MyBytes::from_base64(FILE.replace("\n", "").as_ref());
+    let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let keysizes = repeated_xor::find_best_keysize(&data, TAKE_N);
     if !keysizes.contains(&EXPECTED) {
         return Err(anyhow!("unexpected key size"));
@@ -114,19 +102,55 @@ fn test_6() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[test]
-fn test_7() -> Result<(), anyhow::Error> {
+fn challenge_7() -> Result<(), anyhow::Error> {
     const EXPECTED: &str = "I'm back and I'm ringin' the bell \nA rockin' on the mike while the fly girls yell \nIn ecstasy in the back of me \nWell that's my DJ Deshay cuttin' all them Z's \nHittin' hard and the girlies goin' crazy \nVanilla's on the mike, man I'm not lazy. \n\nI'm lettin' my drug kick in \nIt controls my mouth and I begin \nTo just let it flow, let my concepts go \nMy posse's to the side yellin', Go Vanilla Go! \n\nSmooth 'cause that's the way I will be \nAnd if you don't give a damn, then \nWhy you starin' at me \nSo get off 'cause I control the stage \nThere's no dissin' allowed \nI'm in my own phase \nThe girlies sa y they love me and that is ok \nAnd I can dance better than any kid n' play \n\nStage 2 -- Yea the one ya' wanna listen to \nIt's off my head so let the beat play through \nSo I can funk it up and make it sound good \n1-2-3 Yo -- Knock on some wood \nFor good luck, I like my rhymes atrocious \nSupercalafragilisticexpialidocious \nI'm an effect and that you can bet \nI can take a fly girl and make her wet. \n\nI'm like Samson -- Samson to Delilah \nThere's no denyin', You can try to hang \nBut you'll keep tryin' to get my style \nOver and over, practice makes perfect \nBut not if you're a loafer. \n\nYou'll get nowhere, no place, no time, no girls \nSoon -- Oh my God, homebody, you probably eat \nSpaghetti with a spoon! Come on and say it! \n\nVIP. Vanilla Ice yep, yep, I'm comin' hard like a rhino \nIntoxicating so you stagger like a wino \nSo punks stop trying and girl stop cryin' \nVanilla Ice is sellin' and you people are buyin' \n'Cause why the freaks are jockin' like Crazy Glue \nMovin' and groovin' trying to sing along \nAll through the ghetto groovin' this here song \nNow you're amazed by the VIP posse. \n\nSteppin' so hard like a German Nazi \nStartled by the bases hittin' ground \nThere's no trippin' on mine, I'm just gettin' down \nSparkamatic, I'm hangin' tight like a fanatic \nYou trapped me once and I thought that \nYou might have it \nSo step down and lend me your ear \n'89 in my time! You, '90 is my year. \n\nYou're weakenin' fast, YO! and I can tell it \nYour body's gettin' hot, so, so I can smell it \nSo don't be mad and don't be sad \n'Cause the lyrics belong to ICE, You can call me Dad \nYou're pitchin' a fit, so step back and endure \nLet the witch doctor, Ice, do the dance to cure \nSo come up close and don't be square \nYou wanna battle me -- Anytime, anywhere \n\nYou thought that I was weak, Boy, you're dead wrong \nSo come on, everybody and sing this song \n\nSay -- Play that funky music Say, go white boy, go white boy go \nplay that funky music Go white boy, go white boy, go \nLay down and boogie and play that funky music till you die. \n\nPlay that funky music Come on, Come on, let me hear \nPlay that funky music white boy you say it, say it \nPlay that funky music A little louder now \nPlay that funky music, white boy Come on, Come on, Come on \nPlay that funky music \n";
     const TAKE_N: usize = 3;
     const FILE: &str = include_str!("../data/file_2.txt");
-    let data = MyBytes::from_base64(FILE.replace("\n", "").as_ref());
-    let keys = repeated_xor::try_break(
-        &data,
-        repeated_xor::find_best_keysize(&data, TAKE_N),
-    );
+    let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
+    let keys = repeated_xor::try_break(&data, repeated_xor::find_best_keysize(&data, TAKE_N));
     let decrypted = repeated_xor::try_break_encryption(&data, keys);
     if decrypted != EXPECTED {
         return Err(anyhow!("unexpected result {}", decrypted));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_challenge_1() -> Result<(), anyhow::Error> {
+        challenge_1()
+    }
+
+    #[test]
+    fn test_challenge_2() -> Result<(), anyhow::Error> {
+        challenge_2()
+    }
+
+    #[test]
+    fn test_challenge_3() -> Result<(), anyhow::Error> {
+        challenge_3()
+    }
+
+    #[test]
+    fn test_challenge_4() -> Result<(), anyhow::Error> {
+        challenge_4()
+    }
+
+    #[test]
+    fn test_challenge_5() -> Result<(), anyhow::Error> {
+        challenge_5()
+    }
+
+    #[test]
+    fn test_challenge_6() -> Result<(), anyhow::Error> {
+        challenge_6()
+    }
+
+    #[test]
+    fn test_challenge_7() -> Result<(), anyhow::Error> {
+        challenge_7()
+    }
 }
