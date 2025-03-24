@@ -25,8 +25,8 @@ fn test_2() -> Result<(), anyhow::Error> {
     const EXPECTED: &str = "746865206b696420646f6e277420706c6179";
 
     let result = MyBytes::from(utils::bytes_xor(
-        MyBytes::from_hex(INPUT)?.get_ref(),
-        MyBytes::from_hex(BUFFER)?.get_ref(),
+        &MyBytes::from_hex(INPUT)?,
+        &MyBytes::from_hex(BUFFER)?,
     ))
     .to_hex();
     if result != EXPECTED {
@@ -39,8 +39,8 @@ fn test_2() -> Result<(), anyhow::Error> {
 fn test_3() -> Result<(), anyhow::Error> {
     const INPUT: &str = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
     const EXPECTED: u8 = 88;
-    let result = single_byte_xor::try_break(MyBytes::from_hex(INPUT)?.get_ref())
-        .ok_or(anyhow!("no result"))?;
+    let result =
+        single_byte_xor::try_break(&MyBytes::from_hex(INPUT)?).ok_or(anyhow!("no result"))?;
     if result.byte as u8 != EXPECTED {
         return Err(anyhow!("expected {} got {}", EXPECTED, result.byte));
     }
@@ -94,7 +94,7 @@ a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
         .iter()
         .zip(Bytemap::from_hex(EXPECTED).bytemap)
     {
-        if utils::bytes_xor(line.get_ref(), KEY.as_bytes()) != expected.get_ref() {
+        if utils::bytes_xor(&line, KEY.as_bytes()) != expected.bytes {
             return Err(anyhow!("unexpected result"));
         }
     }
@@ -107,7 +107,7 @@ fn test_6() -> Result<(), anyhow::Error> {
     const TAKE_N: usize = 3;
     const FILE: &str = include_str!("../data/file_2.txt");
     let data = MyBytes::from_base64(FILE.replace("\n", "").as_ref());
-    let keysizes = repeated_xor::find_best_keysize(data.get_ref(), TAKE_N);
+    let keysizes = repeated_xor::find_best_keysize(&data, TAKE_N);
     if !keysizes.contains(&EXPECTED) {
         return Err(anyhow!("unexpected key size"));
     }
@@ -121,10 +121,10 @@ fn test_7() -> Result<(), anyhow::Error> {
     const FILE: &str = include_str!("../data/file_2.txt");
     let data = MyBytes::from_base64(FILE.replace("\n", "").as_ref());
     let keys = repeated_xor::try_break(
-        data.get_ref(),
-        repeated_xor::find_best_keysize(data.get_ref(), TAKE_N),
+        &data,
+        repeated_xor::find_best_keysize(&data, TAKE_N),
     );
-    let decrypted = repeated_xor::try_break_encryption(data.get_ref(), keys);
+    let decrypted = repeated_xor::try_break_encryption(&data, keys);
     if decrypted != EXPECTED {
         return Err(anyhow!("unexpected result {}", decrypted));
     }
