@@ -85,18 +85,19 @@ impl AsRef<[u8]> for MyBytes {
 impl MyBytes {
     // decodes a hex encoded string into bytes
     pub fn from_hex(hex_string: &str) -> Result<MyBytes, hex::FromHexError> {
-        Ok(MyBytes {
-            bytes: hex::decode(hex_string)?,
-        })
+        hex::decode(hex_string).map(MyBytes::from)
     }
+
     // decodes a base64 string into bytes
     pub fn from_base64(base64_string: &str) -> Self {
         MyBytes::from(STANDARD.decode(base64_string).unwrap())
     }
+
     //returns a hex encoded string
     pub fn to_hex(&self) -> String {
         hex::encode(&self.bytes)
     }
+
     // returns a base64 encoded string
     pub fn to_base64(&self) -> String {
         STANDARD.encode(&self.bytes)
