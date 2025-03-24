@@ -5,20 +5,21 @@ use std::{fmt, str::FromStr};
 // struct that holds a vector of Bytes for iterating over larger files
 #[derive(Debug)]
 pub struct Bytemap {
-    pub bytemap: Vec<Bytes>,
+    pub bytemap: Vec<MyBytes>,
 }
 
 impl From<&str> for Bytemap {
     fn from(data: &str) -> Self {
         Bytemap {
-            bytemap: data.lines().map(Bytes::from).collect(),
+            bytemap: data.lines().map(MyBytes::from).collect(),
         }
     }
 }
+
 impl Bytemap {
     pub fn from_hex(data: &str) -> Self {
         Bytemap {
-            bytemap: data.lines().flat_map(Bytes::from_hex).collect(),
+            bytemap: data.lines().flat_map(MyBytes::from_hex).collect(),
         }
     }
 }
@@ -26,10 +27,10 @@ impl Bytemap {
 // Struct that holds bites and easily converts them into usefull types
 // or encrypted strings
 #[derive(Debug)]
-pub struct Bytes {
+pub struct MyBytes {
     pub bytes: Vec<u8>,
 }
-impl fmt::Display for Bytes {
+impl fmt::Display for MyBytes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_fmt(core::format_args!(
             "{}",
@@ -38,44 +39,44 @@ impl fmt::Display for Bytes {
     }
 }
 
-impl FromStr for Bytes {
+impl FromStr for MyBytes {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Bytes {
+        Ok(MyBytes {
             bytes: s.as_bytes().to_owned(),
         })
     }
 }
 
 // generic implementations
-impl From<String> for Bytes {
+impl From<String> for MyBytes {
     fn from(data: String) -> Self {
-        Bytes::from(data.as_str())
+        MyBytes::from(data.as_str())
     }
 }
 
-impl From<&str> for Bytes {
+impl From<&str> for MyBytes {
     fn from(data: &str) -> Self {
         let bytes = data.as_bytes().to_owned();
-        Bytes { bytes }
+        MyBytes { bytes }
     }
 }
 
-impl From<Vec<u8>> for Bytes {
+impl From<Vec<u8>> for MyBytes {
     fn from(bytes: Vec<u8>) -> Self {
-        Bytes { bytes }
+        MyBytes { bytes }
     }
 }
-impl Bytes {
+impl MyBytes {
     // decodes a hex encoded string into bytes
-    pub fn from_hex(hex_string: &str) -> Result<Bytes, hex::FromHexError> {
-        Ok(Bytes {
+    pub fn from_hex(hex_string: &str) -> Result<MyBytes, hex::FromHexError> {
+        Ok(MyBytes {
             bytes: hex::decode(hex_string)?,
         })
     }
     // decodes a base64 string into bytes
     pub fn from_base64(base64_string: &str) -> Self {
-        Bytes {
+        MyBytes {
             bytes: STANDARD.decode(base64_string).unwrap(),
         }
     }
