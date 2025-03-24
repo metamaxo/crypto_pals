@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 // struct that holds a vector of Bytes for iterating over larger files
 #[derive(Debug)]
@@ -37,11 +37,20 @@ impl fmt::Display for Bytes {
         ))
     }
 }
+
+impl FromStr for Bytes {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Bytes {
+            bytes: s.as_bytes().to_owned(),
+        })
+    }
+}
+
 // generic implementations
 impl From<String> for Bytes {
     fn from(data: String) -> Self {
-        let bytes = data.into_bytes();
-        Bytes { bytes }
+        Bytes::from(data.as_str())
     }
 }
 
