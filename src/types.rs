@@ -30,6 +30,7 @@ impl Bytemap {
 pub struct MyBytes {
     pub bytes: Vec<u8>,
 }
+
 impl fmt::Display for MyBytes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_fmt(core::format_args!(
@@ -67,6 +68,20 @@ impl From<Vec<u8>> for MyBytes {
         MyBytes { bytes }
     }
 }
+
+impl std::ops::Deref for MyBytes {
+    type Target = Vec<u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
+    }
+}
+
+impl AsRef<[u8]> for MyBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.bytes.as_slice()
+    }
+}
+
 impl MyBytes {
     // decodes a hex encoded string into bytes
     pub fn from_hex(hex_string: &str) -> Result<MyBytes, hex::FromHexError> {
@@ -76,9 +91,7 @@ impl MyBytes {
     }
     // decodes a base64 string into bytes
     pub fn from_base64(base64_string: &str) -> Self {
-        MyBytes {
-            bytes: STANDARD.decode(base64_string).unwrap(),
-        }
+        MyBytes::from(STANDARD.decode(base64_string).unwrap())
     }
     //returns a hex encoded string
     pub fn to_hex(&self) -> String {
@@ -87,9 +100,5 @@ impl MyBytes {
     // returns a base64 encoded string
     pub fn to_base64(&self) -> String {
         STANDARD.encode(&self.bytes)
-    }
-    // returns a reference of bytes
-    pub fn get_ref(&self) -> &[u8] {
-        &self.bytes
     }
 }
