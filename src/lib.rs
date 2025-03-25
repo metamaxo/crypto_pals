@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+mod aes_128;
 mod traits;
 mod types;
 use types::{Bytemap, Bytes};
@@ -114,6 +115,19 @@ fn challenge_7() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+fn challenge_8() -> Result<(), anyhow::Error> {
+    const KEY: &str = "YELLOW SUBMARINE";
+    const FILE: &str = include_str!("../data/challenge_7_data.txt");
+    const EXPECTED: &str = include_str!("../data/challenge_7_expected.txt");
+    let data = Vec::try_from_base64(FILE.replace("\n", "").as_ref())?;
+    let decrypted_bytes = aes_128::decrypt_aes128(&data, KEY.as_bytes())?;
+    let result = String::from_utf8_lossy(&decrypted_bytes);
+    if result[1..20] != EXPECTED[1..20] {
+        return Err(anyhow!("unexpected result"));
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +165,10 @@ mod tests {
     #[test]
     fn test_challenge_7() -> Result<(), anyhow::Error> {
         challenge_7()
+    }
+
+    #[test]
+    fn test_challenge_8() -> Result<(), anyhow::Error> {
+        challenge_8()
     }
 }
