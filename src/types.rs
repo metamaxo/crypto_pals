@@ -1,24 +1,25 @@
 use anyhow::anyhow;
 use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 // struct that holds a vector of Bytes for iterating over larger files
 #[derive(Debug)]
 pub struct Bytemap {
-    pub bytemap: Vec<Bytes>,
+    pub bytemap: Vec<MyBytes>,
 }
 
 impl From<&str> for Bytemap {
     fn from(data: &str) -> Self {
         Bytemap {
-            bytemap: data.lines().map(Bytes::from).collect(),
+            bytemap: data.lines().map(MyBytes::from).collect(),
         }
     }
 }
+
 impl Bytemap {
     pub fn from_hex(data: &str) -> Self {
         Bytemap {
-            bytemap: data.lines().flat_map(Bytes::from_hex).collect(),
+            bytemap: data.lines().flat_map(MyBytes::from_hex).collect(),
         }
     }
 }
@@ -26,10 +27,11 @@ impl Bytemap {
 // Struct that holds bites and easily converts them into usefull types
 // or encrypted strings
 #[derive(Debug)]
-pub struct Bytes {
+pub struct MyBytes {
     pub bytes: Vec<u8>,
 }
-impl fmt::Display for Bytes {
+
+impl fmt::Display for MyBytes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_fmt(core::format_args!(
             "{}",
@@ -37,49 +39,57 @@ impl fmt::Display for Bytes {
         ))
     }
 }
-// generic implementations
-impl From<String> for Bytes {
+
+impl From<String> for MyBytes {
     fn from(data: String) -> Self {
-        let bytes = data.into_bytes();
-        Bytes { bytes }
+        MyBytes::from(data.as_str())
     }
 }
 
-impl From<&str> for Bytes {
+impl From<&str> for MyBytes {
     fn from(data: &str) -> Self {
         let bytes = data.as_bytes().to_owned();
-        Bytes { bytes }
+        MyBytes { bytes }
     }
 }
 
-impl From<Vec<u8>> for Bytes {
+impl From<Vec<u8>> for MyBytes {
     fn from(bytes: Vec<u8>) -> Self {
-        Bytes { bytes }
+        MyBytes { bytes }
     }
 }
-impl Bytes {
-    // decodes a hex encoded string into bytes
-    pub fn from_hex(hex_string: &str) -> Result<Bytes, hex::FromHexError> {
-        Ok(Bytes {
-            bytes: hex::decode(hex_string)?,
-        })
+
+impl std::ops::Deref for MyBytes {
+    type Target = Vec<u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
     }
+}
+
+impl AsRef<[u8]> for MyBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.bytes.as_slice()
+    }
+}
+
+impl MyBytes {
+    // decodes a hex encoded string into bytes
+    pub fn from_hex(hex_string: &str) -> Result<MyBytes, hex::FromHexError> {
+        hex::decode(hex_string).map(MyBytes::from)
+    }
+
     // decodes a base64 string into bytes
     pub fn from_base64(base64_string: &str) -> Self {
-        Bytes {
-            bytes: STANDARD.decode(base64_string).unwrap(),
-        }
+        MyBytes::from(STANDARD.decode(base64_string).unwrap())
     }
+
     //returns a hex encoded string
     pub fn to_hex(&self) -> String {
         hex::encode(&self.bytes)
     }
+
     // returns a base64 encoded string
     pub fn to_base64(&self) -> String {
         STANDARD.encode(&self.bytes)
-    }
-    // returns a reference of bytes
-    pub fn get_ref(&self) -> &[u8] {
-        &self.bytes
     }
 }

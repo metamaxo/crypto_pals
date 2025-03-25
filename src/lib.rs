@@ -5,7 +5,15 @@ mod types;
 use types::{Bytemap, Bytes};
 mod repeated_xor;
 mod single_byte_xor;
+mod traits;
+mod types;
 mod utils;
+
+use traits::{
+    BytesBase64Ext, BytesExt, BytesHexExt, BytesHexLinesExt as _, BytesStrExt,
+    BytesStrLinesExt as _,
+};
+
 use ::anyhow::anyhow;
 use base64::{engine as _, engine::general_purpose};
 use traits::{
@@ -17,10 +25,17 @@ fn challenge_1() -> Result<(), anyhow::Error> {
     const INPUT: &str = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
     const EXPECTED: &str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
 
+
+    utils::require_eq(
+        <Vec<u8>>::try_from_hex(INPUT)?.to_base64().as_str(),
+        EXPECTED,
+    )
+
     if <Vec<u8>>::try_from_hex(INPUT)?.to_base64() != EXPECTED {
         return Err(anyhow!("unexpected result"));
     }
     Ok(())
+
 }
 
 fn challenge_2() -> Result<(), anyhow::Error> {
@@ -33,10 +48,7 @@ fn challenge_2() -> Result<(), anyhow::Error> {
         &<Vec<u8>>::try_from_hex(BUFFER)?,
     )
     .to_hex();
-    if result != EXPECTED {
-        return Err(anyhow!("unexpected result"));
-    }
-    Ok(())
+    utils::require_eq(result.as_str(), EXPECTED)
 }
 
 fn challenge_3() -> Result<(), anyhow::Error> {
@@ -44,10 +56,14 @@ fn challenge_3() -> Result<(), anyhow::Error> {
     const EXPECTED: u8 = 88;
     let result =
         single_byte_xor::try_break(&<Vec<u8>>::try_from_hex(INPUT)?).ok_or(anyhow!("no result"))?;
+
+    utils::require_eq(result.byte, EXPECTED)
+
     if result.byte as u8 != EXPECTED {
         return Err(anyhow!("expected {} got {}", EXPECTED, result.byte));
     }
     Ok(())
+
 }
 
 fn challenge_4() -> Result<(), anyhow::Error> {
@@ -65,30 +81,29 @@ fn challenge_4() -> Result<(), anyhow::Error> {
     };
 
     let s = String::from_utf8_lossy(&utils::bytes_xor(line, &[result.byte])).to_string();
-
-    if s != EXPECTED {
-        return Err(anyhow!("expected {} got {:?}", EXPECTED, s));
-    };
-    Ok(())
+    utils::require_eq(s.as_str(), EXPECTED)
 }
 
 fn challenge_5() -> Result<(), anyhow::Error> {
+
+    const FILE: &str =
+        "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+    const EXPECTED: &str = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
     const FILE: &str = "Burning 'em, if you ain't quick and nimble
 go crazy when I hear a cymbal";
     const EXPECTED: &str =
         "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272
 a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
     const KEY: &str = "ICE";
-    for (line, expected) in Bytemap::from(FILE)
-        .bytemap
-        .iter()
-        .zip(Bytemap::from_hex(EXPECTED).bytemap)
-    {
-        if utils::bytes_xor(line.get_ref(), KEY.as_bytes()) != expected.get_ref() {
-            return Err(anyhow!("unexpected result"));
-        }
-    }
-    Ok(())
+
+    let file = <Vec<u8>>::from_str(FILE);
+    let expected_lines = <Vec<u8>>::try_from_hex(EXPECTED)?;
+
+    let key = KEY.as_bytes();
+    let decrypted = utils::bytes_xor(&file, key);
+    utils::require_eq(decrypted, expected_lines)
 }
 
 fn challenge_6() -> Result<(), anyhow::Error> {
@@ -97,10 +112,17 @@ fn challenge_6() -> Result<(), anyhow::Error> {
     const FILE: &str = include_str!("../data/file_2.txt");
     let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let keysizes = repeated_xor::find_best_keysize(&data, TAKE_N);
+
+    utils::require(
+        keysizes.contains(&EXPECTED),
+        &format!("keysizes {:?} does not contain {}", keysizes, EXPECTED),
+    )
+
     if !keysizes.contains(&EXPECTED) {
         return Err(anyhow!("unexpected key size"));
     }
     Ok(())
+
 }
 
 fn challenge_7() -> Result<(), anyhow::Error> {
@@ -110,11 +132,16 @@ fn challenge_7() -> Result<(), anyhow::Error> {
     let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let keys = repeated_xor::try_break(&data, repeated_xor::find_best_keysize(&data, TAKE_N));
     let decrypted = repeated_xor::try_break_encryption(&data, keys);
+
+    utils::require_eq(decrypted.as_str(), EXPECTED)
     if decrypted != EXPECTED {
-        return Err(anyhow!("unexpected result {}", decrypted));
-    }
-    Ok(())
+       return Err(anyhow!("unexpected result {}", decrypted));
 }
+
+
+
+
+    
 
 fn challenge_8() -> Result<(), anyhow::Error> {
     const KEY: &str = "YELLOW SUBMARINE";

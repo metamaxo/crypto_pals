@@ -6,6 +6,7 @@ use crate::{
 use anyhow::anyhow;
 use std::slice;
 
+
 pub struct Key {
     key: Vec<u8>,
 }
@@ -15,6 +16,7 @@ impl From<Vec<u8>> for Key {
         Key { key }
     }
 }
+
 
 pub fn keysize_scores(data: &[u8]) -> Vec<(u32, f32)> {
     const MAX_KEYSIZE: u32 = 40;
@@ -119,14 +121,7 @@ Suspendisse potenti. Aliquam porta lorem ut porta venenatis. Donec ut scelerisqu
             miss_count += 1;
         }
     }
-    if miss_count > ALLOWED_MISSES {
-        return Err(anyhow!(
-            "too many misses {} allowed {}",
-            miss_count,
-            ALLOWED_MISSES
-        ));
-    };
-    Ok(())
+    utils::require(miss_count <= ALLOWED_MISSES, &format!("too many misses {}", miss_count))
 }
 
 #[test]
@@ -150,14 +145,15 @@ fn find_keysize_test() -> Result<(), anyhow::Error> {
         scores.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let found_at_position = scores.iter().position(|item| item.0 == keysize).unwrap();
-        if found_at_position > MAX_ALLOWED_POSITION {
-            return Err(anyhow!(
+        utils::require(
+            found_at_position <= MAX_ALLOWED_POSITION,
+            &format!(
                 "keysize {} expected below position {} found at position {}",
                 keysize,
                 MAX_ALLOWED_POSITION,
                 found_at_position,
-            ));
-        }
+            ),
+        )?;
     }
     Ok(())
 }

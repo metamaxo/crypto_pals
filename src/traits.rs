@@ -1,4 +1,5 @@
 use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
+
 use itertools::Itertools;
 //
 pub trait BytesStrLinesExt: AsRef<[Vec<u8>]> {
@@ -9,6 +10,7 @@ pub trait BytesStrLinesExt: AsRef<[Vec<u8>]> {
             .collect::<Vec<String>>()
             .join("\n")
     }
+
     fn from_str(data: &str) -> Self
     where
         Self: Sized;
@@ -57,26 +59,33 @@ pub trait BytesStrExt: AsRef<[u8]> {
 
 pub trait BytesExt: BytesBase64Ext + BytesHexExt + BytesStrExt {}
 
+
+impl<T> BytesExt for T where T: BytesBase64Ext + BytesHexExt + BytesStrExt {}
+
 impl BytesBase64Ext for Vec<u8> {
     fn try_from_base64(base64_string: &str) -> Result<Self, base64::DecodeError> {
         STANDARD.decode(base64_string.trim())
     }
 }
+
 impl BytesHexExt for Vec<u8> {
     fn try_from_hex(hex_string: &str) -> Result<Self, hex::FromHexError> {
         hex::decode(hex_string.trim())
     }
 }
+
 impl BytesStrExt for Vec<u8> {
     fn from_str(data: &str) -> Self {
         data.as_bytes().to_owned()
     }
 }
+
 impl BytesStrLinesExt for Vec<Vec<u8>> {
     fn from_str(data: &str) -> Self {
         data.lines().map(<Vec<u8>>::from_str).collect()
     }
 }
+
 impl BytesHexLinesExt for Vec<Vec<u8>> {
     fn try_from_hex(data: &str) -> Result<Self, hex::FromHexError> {
         data.lines().map(<Vec<u8>>::try_from_hex).collect()
@@ -93,7 +102,20 @@ mod tests {
         let vec = Vec::from(&original[..]);
         let base64 = vec.to_base64();
         assert_eq!(base64, "SGVsbG8sIFdvcmxkIQ==");
+
+
+        let decoded = Vec::try_from_base64(&base64).unwrap();
+        assert_eq!(decoded, original);
+
+        let with_whitespace = "  SGVsbG8sIFdvcmxkIQ==  \n";
+        let decoded = Vec::try_from_base64(with_whitespace).unwrap();
+        assert_eq!(decoded, original);
+
+        assert!(Vec::<u8>::try_from_base64("invalid base64!!!").is_err());
     }
+
+
+
     #[test]
     fn test_bytes_hex_ext() {
         use crate::traits::BytesHexExt;
@@ -106,13 +128,17 @@ mod tests {
         let decoded = Vec::try_from_hex(&hex).unwrap();
         assert_eq!(decoded, original);
 
+
+
         let with_whitespace = " 48656c6c6f2c20576f726c6421 \n";
+
         let decoded = Vec::try_from_hex(with_whitespace).unwrap();
         assert_eq!(decoded, original);
 
         assert!(Vec::<u8>::try_from_hex("invalid hex!!!").is_err());
         assert!(Vec::<u8>::try_from_hex("123").is_err()); // Odd length
     }
+
     #[test]
     fn test_bytes_str_ext() {
         use crate::traits::BytesStrExt;
@@ -127,11 +153,15 @@ mod tests {
             String::from_utf8_lossy(&invalid_utf8)
         );
     }
+
+
+
     #[test]
     fn test_bytes_str_lines_ext() {
         use crate::traits::{BytesStrExt, BytesStrLinesExt};
         let original = "Hello\nWorld\n!";
         let vec = Vec::<Vec<u8>>::from_str(original);
+
 
         assert_eq!(vec.len(), 3);
         assert_eq!(vec[0], b"Hello");
@@ -148,9 +178,12 @@ mod tests {
         assert_eq!(vec[2], b"");
         assert_eq!(vec[3], b"World");
     }
+
+
     #[test]
     fn test_bytes_hex_lines_ext() {
-        use crate::traits::{BytesHexExt, BytesHexLinesExt};
+        use crate::traits::{BytesHexLinesExt, BytesHexExt};
+
         let hex_input = "48656c6c6f\n576f726c64\n21";
         let vec = Vec::<Vec<u8>>::try_from_hex(hex_input).unwrap();
         assert_eq!(vec.len(), 3);
@@ -163,6 +196,7 @@ mod tests {
         let invalid_hex = "48656c6c6f\ninvalid\n21";
         assert!(Vec::<Vec<u8>>::try_from_hex(invalid_hex).is_err());
     }
+
     #[test]
     fn test_bytes_ext_combined() {
         use crate::traits::{BytesBase64Ext, BytesHexExt, BytesStrExt};

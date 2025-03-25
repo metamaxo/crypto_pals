@@ -96,6 +96,20 @@ pub fn english_score_str(input: &str) -> f32 {
     score_frequency_map(&character_frequency_map(input))
 }
 
+pub fn require(condition: bool, message: &str) -> Result<(), anyhow::Error> {
+    if !condition {
+        return Err(anyhow!(message.to_string()));
+    }
+    Ok(())
+}
+
+pub fn require_eq<T: PartialEq + std::fmt::Debug>(left: T, right: T) -> Result<(), anyhow::Error> {
+    require(
+        left == right,
+        &format!("expected {:?} got {:?}", right, left),
+    )
+}
+
 #[test]
 pub fn test_english_frequency() -> Result<(), anyhow::Error> {
     const SHORT_ENGLISH: &str = "hello";
@@ -104,8 +118,8 @@ pub fn test_english_frequency() -> Result<(), anyhow::Error> {
     let short_english_score = english_score_str(SHORT_ENGLISH);
     let long_gibberish_score = english_score_str(LONG_GIBBERISH);
 
-    if short_english_score < long_gibberish_score {
-        return Err(anyhow!("unexpected result"));
-    }
-    Ok(())
+    require(
+        short_english_score > long_gibberish_score,
+        "unexpected result",
+    )
 }
