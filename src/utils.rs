@@ -2,10 +2,6 @@
 use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
 
-pub fn base64_to_bytes(data: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    general_purpose::STANDARD.decode(data)
-}
-
 pub fn bytes_xor(left: &[u8], right: &[u8]) -> Vec<u8> {
     left.iter()
         .zip(right.iter().cycle())

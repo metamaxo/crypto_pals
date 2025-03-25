@@ -6,6 +6,18 @@ use crate::{
 use anyhow::anyhow;
 use std::slice;
 
+
+pub struct Key {
+    key: Vec<u8>,
+}
+
+impl From<Vec<u8>> for Key {
+    fn from(key: Vec<u8>) -> Self {
+        Key { key }
+    }
+}
+
+
 pub fn keysize_scores(data: &[u8]) -> Vec<(u32, f32)> {
     const MAX_KEYSIZE: u32 = 40;
     let mut results = Vec::new();

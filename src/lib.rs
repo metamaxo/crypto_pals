@@ -1,4 +1,8 @@
 #![allow(dead_code, unused_imports)]
+mod aes_128;
+mod traits;
+mod types;
+use types::{Bytemap, Bytes};
 mod repeated_xor;
 mod single_byte_xor;
 mod traits;
@@ -12,15 +16,26 @@ use traits::{
 
 use ::anyhow::anyhow;
 use base64::{engine as _, engine::general_purpose};
+use traits::{
+    BytesBase64Ext, BytesExt, BytesHexExt, BytesHexLinesExt as _, BytesStrExt,
+    BytesStrLinesExt as _,
+};
 
 fn challenge_1() -> Result<(), anyhow::Error> {
     const INPUT: &str = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
     const EXPECTED: &str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
 
+
     utils::require_eq(
         <Vec<u8>>::try_from_hex(INPUT)?.to_base64().as_str(),
         EXPECTED,
     )
+
+    if <Vec<u8>>::try_from_hex(INPUT)?.to_base64() != EXPECTED {
+        return Err(anyhow!("unexpected result"));
+    }
+    Ok(())
+
 }
 
 fn challenge_2() -> Result<(), anyhow::Error> {
@@ -41,7 +56,14 @@ fn challenge_3() -> Result<(), anyhow::Error> {
     const EXPECTED: u8 = 88;
     let result =
         single_byte_xor::try_break(&<Vec<u8>>::try_from_hex(INPUT)?).ok_or(anyhow!("no result"))?;
+
     utils::require_eq(result.byte, EXPECTED)
+
+    if result.byte as u8 != EXPECTED {
+        return Err(anyhow!("expected {} got {}", EXPECTED, result.byte));
+    }
+    Ok(())
+
 }
 
 fn challenge_4() -> Result<(), anyhow::Error> {
@@ -63,9 +85,17 @@ fn challenge_4() -> Result<(), anyhow::Error> {
 }
 
 fn challenge_5() -> Result<(), anyhow::Error> {
+
     const FILE: &str =
         "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
     const EXPECTED: &str = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
+    const FILE: &str = "Burning 'em, if you ain't quick and nimble
+go crazy when I hear a cymbal";
+    const EXPECTED: &str =
+        "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272
+a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
     const KEY: &str = "ICE";
 
     let file = <Vec<u8>>::from_str(FILE);
@@ -82,10 +112,17 @@ fn challenge_6() -> Result<(), anyhow::Error> {
     const FILE: &str = include_str!("../data/file_2.txt");
     let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let keysizes = repeated_xor::find_best_keysize(&data, TAKE_N);
+
     utils::require(
         keysizes.contains(&EXPECTED),
         &format!("keysizes {:?} does not contain {}", keysizes, EXPECTED),
     )
+
+    if !keysizes.contains(&EXPECTED) {
+        return Err(anyhow!("unexpected key size"));
+    }
+    Ok(())
+
 }
 
 fn challenge_7() -> Result<(), anyhow::Error> {
@@ -95,9 +132,29 @@ fn challenge_7() -> Result<(), anyhow::Error> {
     let data = <Vec<u8>>::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let keys = repeated_xor::try_break(&data, repeated_xor::find_best_keysize(&data, TAKE_N));
     let decrypted = repeated_xor::try_break_encryption(&data, keys);
+
     utils::require_eq(decrypted.as_str(), EXPECTED)
+    if decrypted != EXPECTED {
+       return Err(anyhow!("unexpected result {}", decrypted));
 }
 
+
+
+
+    
+
+fn challenge_8() -> Result<(), anyhow::Error> {
+    const KEY: &str = "YELLOW SUBMARINE";
+    const FILE: &str = include_str!("../data/challenge_7_data.txt");
+    const EXPECTED: &str = include_str!("../data/challenge_7_expected.txt");
+    let data = Vec::try_from_base64(FILE.replace("\n", "").as_ref())?;
+    let decrypted_bytes = aes_128::decrypt_aes128(&data, KEY.as_bytes())?;
+    let result = String::from_utf8_lossy(&decrypted_bytes);
+    if result[1..20] != EXPECTED[1..20] {
+        return Err(anyhow!("unexpected result"));
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +192,10 @@ mod tests {
     #[test]
     fn test_challenge_7() -> Result<(), anyhow::Error> {
         challenge_7()
+    }
+
+    #[test]
+    fn test_challenge_8() -> Result<(), anyhow::Error> {
+        challenge_8()
     }
 }

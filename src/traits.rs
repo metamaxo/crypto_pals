@@ -1,5 +1,7 @@
 use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
 
+use itertools::Itertools;
+//
 pub trait BytesStrLinesExt: AsRef<[Vec<u8>]> {
     fn to_str(&self) -> String {
         self.as_ref()
@@ -57,6 +59,7 @@ pub trait BytesStrExt: AsRef<[u8]> {
 
 pub trait BytesExt: BytesBase64Ext + BytesHexExt + BytesStrExt {}
 
+
 impl<T> BytesExt for T where T: BytesBase64Ext + BytesHexExt + BytesStrExt {}
 
 impl BytesBase64Ext for Vec<u8> {
@@ -100,6 +103,7 @@ mod tests {
         let base64 = vec.to_base64();
         assert_eq!(base64, "SGVsbG8sIFdvcmxkIQ==");
 
+
         let decoded = Vec::try_from_base64(&base64).unwrap();
         assert_eq!(decoded, original);
 
@@ -109,6 +113,8 @@ mod tests {
 
         assert!(Vec::<u8>::try_from_base64("invalid base64!!!").is_err());
     }
+
+
 
     #[test]
     fn test_bytes_hex_ext() {
@@ -122,7 +128,10 @@ mod tests {
         let decoded = Vec::try_from_hex(&hex).unwrap();
         assert_eq!(decoded, original);
 
-        let with_whitespace = "  48656c6c6f2c20576f726c6421  \n";
+
+
+        let with_whitespace = " 48656c6c6f2c20576f726c6421 \n";
+
         let decoded = Vec::try_from_hex(with_whitespace).unwrap();
         assert_eq!(decoded, original);
 
@@ -145,11 +154,15 @@ mod tests {
         );
     }
 
+
+
     #[test]
     fn test_bytes_str_lines_ext() {
-        use crate::traits::{BytesStrLinesExt, BytesStrExt};
+        use crate::traits::{BytesStrExt, BytesStrLinesExt};
         let original = "Hello\nWorld\n!";
         let vec = Vec::<Vec<u8>>::from_str(original);
+
+
         assert_eq!(vec.len(), 3);
         assert_eq!(vec[0], b"Hello");
         assert_eq!(vec[1], b"World");
@@ -166,9 +179,11 @@ mod tests {
         assert_eq!(vec[3], b"World");
     }
 
+
     #[test]
     fn test_bytes_hex_lines_ext() {
         use crate::traits::{BytesHexLinesExt, BytesHexExt};
+
         let hex_input = "48656c6c6f\n576f726c64\n21";
         let vec = Vec::<Vec<u8>>::try_from_hex(hex_input).unwrap();
         assert_eq!(vec.len(), 3);
