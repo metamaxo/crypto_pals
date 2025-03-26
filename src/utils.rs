@@ -110,7 +110,27 @@ pub fn require_eq<T: PartialEq + std::fmt::Debug>(left: T, right: T) -> Result<(
     )
 }
 
+pub fn add_padding(data: &[u8], length: usize) -> Vec<u8> {
+    let padsize = length - data.len();
+    let mut result = data.to_owned();
+    result.extend((0..padsize).map(|_| padsize.to_string().as_bytes()[0]));
+    result
+}
+
 #[test]
+pub fn test_add_padding() {
+    const INPUT: &[u8] = b"YELLOW SUBMARINE";
+    const EXPECTED_1: &[u8] = b"YELLOW SUBMARINE4444";
+    const EXPECTED_2: &[u8] = b"YELLOW SUBMARINE88888888";
+    const EXPECTED_3: &[u8] = b"YELLOW SUBMARINE7777777";
+    assert_eq!(&add_padding(INPUT, 20), EXPECTED_1);
+    assert_eq!(&add_padding(INPUT, 20).len(), &20);
+    assert_eq!(&add_padding(INPUT, 24), EXPECTED_2);
+    assert_eq!(&add_padding(INPUT, 24).len(), &24);
+    assert_eq!(&add_padding(INPUT, 23), EXPECTED_3);
+    assert_eq!(&add_padding(INPUT, 23).len(), &23);
+}
+
 pub fn test_english_frequency() -> Result<(), anyhow::Error> {
     const SHORT_ENGLISH: &str = "hello";
     const LONG_GIBBERISH: &str = "djkaf;dskaj;eolajek;auipubiaujdfai;jea'rejajreiahgkda;jbkfjakdlfja;jeklwq;urti32u5iou643612j3jlkdja; ekjalek;jke;ajreial;rejk";
