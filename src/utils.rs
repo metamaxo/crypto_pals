@@ -110,6 +110,10 @@ pub fn require_eq<T: PartialEq + std::fmt::Debug>(left: T, right: T) -> Result<(
     )
 }
 
+pub fn pad_to(data: &mut Vec<u8>, length: usize) {
+    data.extend(std::iter::repeat(0).take(length - data.len()));
+}
+
 pub fn add_padding(data: &[u8], length: usize) -> Vec<u8> {
     let padsize = length - data.len();
     let mut result = data.to_owned();
