@@ -105,7 +105,7 @@ fn challenge_8() -> Result<(), anyhow::Error> {
     const FILE: &str = include_str!("../data/challenge_7_data.txt");
     const EXPECTED: &str = include_str!("../data/challenge_7_expected.txt");
     let data = Vec::try_from_base64(FILE.replace("\n", "").as_ref())?;
-    let decrypted_bytes = aes_128::decrypt_aes128(&data, KEY.as_bytes())?;
+    let decrypted_bytes = aes_128::decrypt_aes128_ecb_mode(&data, KEY.as_bytes())?;
     let result = String::from_utf8_lossy(&decrypted_bytes);
     println!("{}", result);
     utils::require_eq(&result[1..20], &EXPECTED[1..20])
