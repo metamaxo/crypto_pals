@@ -101,30 +101,41 @@ fn challenge_7() -> Result<(), anyhow::Error> {
 }
 
 fn challenge_8() -> Result<(), anyhow::Error> {
-    const KEY: &str = "YELLOW SUBMARINE";
-    const FILE: &str = include_str!("../data/challenge_7_data.txt");
-    const EXPECTED: &str = include_str!("../data/challenge_7_expected.txt");
-    let data = Vec::try_from_base64(FILE.replace("\n", "").as_ref())?;
-    let decrypted_bytes = aes_128::decrypt_aes128_ecb_mode(&data, KEY.as_bytes())?;
-    let result = String::from_utf8_lossy(&decrypted_bytes);
-    println!("{}", result);
-    utils::require_eq(&result[1..20], &EXPECTED[1..20])
-}
+    pub fn count_identical_chunks(data: &[u8]) -> u32 {
+        let mut count = 0;
+        data.chunks(16).for_each(|chunk| {
+            if data.chunks(16).filter(|n| *n == chunk).count() > 1 {
+                count += 1
+            }
+        });
+        count
+    }
 
-fn real_challenge_8() -> Result<(), anyhow::Error> {
     const DATA: &str = include_str!("../data/challenge_8.txt");
+    // KEY SIZE under AES-128 is always 16 bytes (16 * 8 = 128 bits)
+    const KEY_SIZE: usize = 16;
     const EXPECTED: usize = 132;
+
     let data = Vec::<Vec<u8>>::try_from_hex(DATA)?;
-    let mut result = 0;
-    for (index, item) in data.iter().enumerate() {
-        if utils::find_similar_chunks(item) > 1 {
-            result = index;
-        }
-    }
-    if result != EXPECTED {
-        return Err(anyhow!("unexpected result!"));
-    }
-    Ok(())
+    let similar_counts = data
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            (
+                index,
+                count_identical_chunks(item.as_slice() as &[u8]) as usize,
+            )
+        })
+        .filter(|(_, count)| *count > 1)
+        .collect::<Vec<_>>();
+
+    let most_similar_index = similar_counts
+        .iter()
+        .max_by(|(_, left), (_, right)| left.cmp(right))
+        .ok_or(anyhow!("no result"))?
+        .0;
+
+    utils::require_eq(most_similar_index, EXPECTED)
 }
 
 #[cfg(test)]
@@ -170,8 +181,4 @@ mod tests {
     fn test_challenge_8() -> Result<(), anyhow::Error> {
         challenge_8()
     }
-    // #[test]
-    // fn real_challenge_8() -> Result<(), anyhow::Error> {
-    //     challenge_8()
-    // }
 }
