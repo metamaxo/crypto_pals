@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports)]
 mod aes_128;
-mod challenge_8;
+mod challenge_10;
 mod repeated_xor;
 mod single_byte_xor;
 mod traits;
@@ -107,8 +107,26 @@ fn challenge_8() -> Result<(), anyhow::Error> {
     let data = Vec::try_from_base64(FILE.replace("\n", "").as_ref())?;
     let decrypted_bytes = aes_128::decrypt_aes128(&data, KEY.as_bytes())?;
     let result = String::from_utf8_lossy(&decrypted_bytes);
+    println!("{}", result);
     utils::require_eq(&result[1..20], &EXPECTED[1..20])
 }
+
+fn real_challenge_8() -> Result<(), anyhow::Error> {
+    const DATA: &str = include_str!("../data/challenge_8.txt");
+    const EXPECTED: usize = 132;
+    let data = Vec::<Vec<u8>>::try_from_hex(DATA)?;
+    let mut result = 0;
+    for (index, item) in data.iter().enumerate() {
+        if utils::find_similar_chunks(item) > 1 {
+            result = index;
+        }
+    }
+    if result != EXPECTED {
+        return Err(anyhow!("unexpected result!"));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,4 +170,8 @@ mod tests {
     fn test_challenge_8() -> Result<(), anyhow::Error> {
         challenge_8()
     }
+    // #[test]
+    // fn real_challenge_8() -> Result<(), anyhow::Error> {
+    //     challenge_8()
+    // }
 }
