@@ -110,21 +110,15 @@ pub fn require_eq<T: PartialEq + std::fmt::Debug>(left: T, right: T) -> Result<(
     )
 }
 
+pub fn pad_to(data: &mut Vec<u8>, length: usize) {
+    data.extend(std::iter::repeat(0).take(length - data.len()));
+}
+
 pub fn add_padding(data: &[u8], length: usize) -> Vec<u8> {
     let padsize = length - data.len();
     let mut result = data.to_owned();
     result.extend((0..padsize).map(|_| padsize.to_string().as_bytes()[0]));
     result
-}
-
-pub fn find_similar_chunks(data: &[u8]) -> u32 {
-    let mut count = 0;
-    data.chunks(4).for_each(|chunk| {
-        if data.chunks(4).filter(|n| *n == chunk).count() > 1 {
-            count += 1
-        }
-    });
-    count
 }
 
 #[test]
