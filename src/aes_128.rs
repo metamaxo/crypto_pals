@@ -67,22 +67,23 @@ pub fn decrypt_aes128_ecb_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyho
 /// WARN: The IV and padding scheme used in this function are not secure, this function should not
 /// be used in practice.
 pub fn encrypt_aes128_cbc_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    let mut result = Vec::new();
     let mut previous_encrypted_block = vec![0u8; key.len()]; // this is the IV
 
     //for every block, xor with previous block, then xor it with the key to encrypt,
     //if the last block is shorter than the block size, padding will be added.
-    for block in data.chunks(key.len()) {
-        let padded_block = if block.len() == key.len() {
-            block.to_vec()
-        } else {
-            utils::add_padding(block, key.len())
-        };
-        let block_to_encrypt = utils::bytes_xor(&padded_block, &previous_encrypted_block);
-        let ciphertext_block = utils::bytes_xor(&block_to_encrypt, key);
-        result.extend_from_slice(&ciphertext_block);
-        previous_encrypted_block = ciphertext_block;
-    }
+    let result = data
+        .chunks(key.len())
+        //add padding to each block to ensure they're the same length.
+        .map(|block| utils::add_padding(block, key.len()))
+        //first xor the block with previously encrypted ciphertext block. next xor the block with the key
+        .flat_map(|block| {
+            let block_to_encrypt = utils::bytes_xor(&block, &previous_encrypted_block);
+            let ciphertext_block = utils::bytes_xor(&block_to_encrypt, key);
+            //clone encrypted block so we can use it in the next cycle.
+            previous_encrypted_block = ciphertext_block.clone();
+            ciphertext_block
+        })
+        .collect();
 
     Ok(result)
 }
@@ -106,7 +107,6 @@ pub fn decrypt_aes128_cbc_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyho
     }
     let mut result = Vec::new();
     let mut previous_ciphertext_block = vec![0u8; key.len()]; // This is the IV
-
     for block in data.chunks(key.len()) {
         // Decrypt the current block
         let decrypted_block = utils::bytes_xor(block, key);
@@ -125,7 +125,7 @@ pub fn decrypt_aes128_cbc_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyho
 }
 
 #[test]
-fn cbc_mode_encrypt_test() -> Result<(), anyhow::Error> {
+fn test_aes128_cbcteode() -> Result<(), anyhow::Error> {
     const LOREM: &str = include_str!("../data/lorem_ipsum.txt");
     const KEY: &str = "YELLOW SUBMARINE";
 
@@ -138,7 +138,7 @@ fn cbc_mode_encrypt_test() -> Result<(), anyhow::Error> {
 }
 
 #[test]
-fn test_aes128_2() -> Result<(), anyhow::Error> {
+fn test_aes128_ecb_mode() -> Result<(), anyhow::Error> {
     const LOREM: &str = include_str!("../data/lorem_ipsum.txt");
     const KEY: &str = "YELLOW SUBMARINE";
     let encrypted = encrypt_aes128_ecb_mode(LOREM.as_bytes(), KEY.as_bytes());
