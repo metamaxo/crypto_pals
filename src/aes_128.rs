@@ -103,9 +103,7 @@ fn test_aes128_cbc_mode() -> Result<(), anyhow::Error> {
 
     let encrypted = encrypt_aes128_cbc(LOREM.as_bytes(), KEY, &mut IV.clone())?;
     let result = decrypt_aes128_cbc(&encrypted, KEY, &mut IV.clone())?;
-    if result != LOREM.as_bytes() {
-        return Err(anyhow!("unexpected result"));
-    }
+    utils::require_eq(result.as_slice(), LOREM.as_bytes())?;
     Ok(())
 }
 
@@ -115,8 +113,6 @@ fn test_aes128_ecb_mode() -> Result<(), anyhow::Error> {
     const KEY: &[u8; 16] = b"YELLOW SUBMARINE";
     let encrypted = encrypt_aes128_ecb(LOREM.as_bytes(), KEY)?;
     let result = decrypt_aes128_ecb(&encrypted, KEY)?;
-    if result != LOREM.as_bytes() {
-        return Err(anyhow!("unexpected result"));
-    }
+    utils::require_eq(result.as_slice(), LOREM.as_bytes())?;
     Ok(())
 }
