@@ -26,7 +26,7 @@ fn unpad_pkcs7(mut data: Vec<u8>) -> Vec<u8> {
 }
 
 /// Encrypt with AES-128 in CBC mode
-pub fn encrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Result<Vec<u8>> {
+pub fn encrypt_aes128_cbc(data: &[u8], key: &[u8], iv: &mut [u8]) -> Result<Vec<u8>> {
     let cipher = Aes128::new(GenericArray::from_slice(key));
     let padded = pad_pkcs7(data);
     let mut result = Vec::with_capacity(padded.len());
@@ -43,7 +43,7 @@ pub fn encrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Res
 }
 
 /// Decrypt with AES-128 in CBC mode
-pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Result<Vec<u8>> {
+pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8]) -> Result<Vec<u8>> {
     if data.len() % 16 != 0 {
         return Err(anyhow!("ciphertext length must be a multiple of 16"));
     }
@@ -63,7 +63,7 @@ pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Res
 }
 
 /// Encrypt with AES-128 in ECB mode
-pub fn encrypt_aes128_ecb(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>> {
+pub fn encrypt_aes128_ecb(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     let cipher = Aes128::new(GenericArray::from_slice(key));
     let padded = pad_pkcs7(data);
     let mut result = Vec::with_capacity(padded.len());
@@ -78,7 +78,7 @@ pub fn encrypt_aes128_ecb(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>> {
 }
 
 /// Decrypt with AES-128 in ECB mode
-pub fn decrypt_aes128_ecb(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>> {
+pub fn decrypt_aes128_ecb(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     if data.len() % 16 != 0 {
         return Err(anyhow!("ciphertext length must be a multiple of 16"));
     }

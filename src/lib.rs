@@ -1,6 +1,8 @@
 #![allow(dead_code, unused_imports)]
+
+use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
 mod aes_128;
-mod challenge_10;
+mod challenge_11;
 mod repeated_xor;
 mod single_byte_xor;
 mod traits;
@@ -13,7 +15,6 @@ use traits::{
 };
 
 use ::anyhow::anyhow;
-use base64::{engine as _, engine::general_purpose};
 
 fn challenge_1() -> Result<(), anyhow::Error> {
     const INPUT: &str = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
@@ -138,6 +139,39 @@ fn challenge_8() -> Result<(), anyhow::Error> {
     utils::require_eq(most_similar_index, EXPECTED)
 }
 
+fn challenge_10() -> Result<(), anyhow::Error> {
+    const DATA: &str = include_str!("../data/challenge_10.txt");
+    const EXPECTED: &str = include_str!("../data/challlenge_10_expected.txt");
+    const KEY: &[u8; 16] = b"YELLOW SUBMARINE";
+    const IV: &[u8; 16] = b"0000000000000000";
+
+    // Remove new lines and hex decode data.
+    let data_line = DATA.lines().collect::<String>();
+    let data = STANDARD
+        .decode(data_line)
+        .map_err(|_| anyhow!("Failed to decode base64"))?;
+    // CDC decrypt encrypted data
+    let mut iv = *IV;
+    let result = crate::aes_128::decrypt_aes128_cbc(&data, KEY, &mut iv)
+        .map_err(|_| anyhow!("Failed to decrypt AES-128 CBC"))?;
+    let string_result = String::from_utf8_lossy(&result);
+    // Create similarity_count to test result, if similarity_count is over 50, result should be
+    // satisfactory.
+    let mut similarity_count = 0;
+    for word in string_result.split_ascii_whitespace() {
+        if EXPECTED.contains(word) {
+            similarity_count += 1
+        }
+    }
+    if similarity_count < 50 {
+        return Err(anyhow!(
+            "unexpected result, similarity_count: {:?}",
+            similarity_count
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +214,10 @@ mod tests {
     #[test]
     fn test_challenge_8() -> Result<(), anyhow::Error> {
         challenge_8()
+    }
+
+    #[test]
+    fn challenge_10_test() -> Result<(), anyhow::Error> {
+        challenge_10()
     }
 }
