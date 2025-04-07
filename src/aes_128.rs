@@ -1,153 +1,118 @@
 use crate::utils;
-use anyhow::anyhow;
 
-/// Encrypt data using AES-128 in ECB mode
-///
-/// ECB mode works by splitting each block of data into equal-sized blocks and
-/// encrypting them individually with the same key. This means that identical
-/// blocks of data will be encrypted to the same output, which can leak
-/// information about the data.
-/// WARN: ECB mode is insecure and should not be used in practice
-pub fn encrypt_aes128_ecb_mode(data: &[u8], key: &[u8]) -> Vec<u8> {
-    data.chunks(key.len())
-        // Ensure blocks are padded to the key length
-        .map(|block| utils::add_padding(block, key.len()))
-        // Encrypt each block and flatten the result
-        .flat_map(|block| utils::bytes_xor(&block, key))
+use aes::Aes128;
+use aes::cipher::generic_array::GenericArray;
+use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
+use anyhow::{Result, anyhow};
+
+/// Pad using PKCS#7
+fn pad_pkcs7(data: &[u8]) -> Vec<u8> {
+    let pad_len = 16 - (data.len() % 16);
+    data.iter()
+        .cloned()
+        .chain(std::iter::repeat(pad_len as u8).take(pad_len))
         .collect()
 }
 
-/// Decrypt data using AES-128 in ECB mode
-///
-/// ECB mode works by splitting each block of data into equal-sized blocks and
-/// encrypting them individually with the same key. This means that identical
-/// blocks of data will be encrypted to the same output, which can leak
-/// information about the data.
-/// WARN: ECB mode is insecure and should not be used in practice
-pub fn decrypt_aes128_ecb_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    /// Remove padding from a slice of bytes
-    /// Due to padding being added to the end of the data, we have to remove it
-    /// after decryption. A priori, we don't know how much padding was added, so
-    /// we have to guess. We do this by looking for repeating bytes at the end
-    /// of the data.
-    /// NOTE: Only to be used in this context
-    fn remove_padding(slice: &[u8]) -> &[u8] {
-        // Count the number of repeating bytes at the end of the slice
-        let n_repeating_end = slice
-            .iter()
-            .rev()
-            .take_while(|&n| *n == slice[slice.len() - 1])
-            .count();
-        // Return the slice without the repeating bytes *as a reference*
-        &slice[0..slice.len() - n_repeating_end]
+/// Remove PKCS#7 padding
+fn unpad_pkcs7(mut data: Vec<u8>) -> Vec<u8> {
+    if let Some(&pad) = data.last() {
+        let len = data.len();
+        if (pad as usize) <= len && data[len - pad as usize..].iter().all(|&b| b == pad) {
+            data.truncate(len - pad as usize);
+        }
     }
-    // Ensure data length is a multiple of key length
-    if data.len() % key.len() != 0 {
-        return Err(anyhow!("data length is not a multiple of key length"));
-    }
-    // Decrypt each block and flatten the result
-    // The last block may have padding, so we remove it before XOR
-    Ok(data
-        .chunks(key.len())
-        .enumerate()
-        .flat_map(|(i, block)| {
-            // If this is the last chunk, remove padding before XOR
-            if i == data.len() / key.len() - 1 {
-                remove_padding(&utils::bytes_xor(block, key)).to_owned()
-            } else {
-                utils::bytes_xor(block, key)
-            }
-        })
-        .collect())
+    data
 }
 
-/// CBC encryption uses the previously encrypted block to encrypt the next block. Since the first
-/// block will not have a predecessor, an initialization vector is needed to make this encryption
-/// method work.
-/// WARN: The IV and padding scheme used in this function are not secure, this function should not
-/// be used in practice.
-pub fn encrypt_aes128_cbc_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    // Create the IV
-    let mut previous_encrypted_block = vec![0u8; key.len()];
+/// Encrypt with AES-128 in CBC mode
+pub fn encrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Result<Vec<u8>> {
+    let cipher = Aes128::new(GenericArray::from_slice(key));
+    let padded = pad_pkcs7(data);
+    let mut result = Vec::with_capacity(padded.len());
 
-    // For every block, xor with previous block, then xor it with the key to encrypt,
-    // If the last block is shorter than the block size, padding will be added.
-    Ok(data
-        .chunks(key.len())
-        // Add padding to each block to ensure they're the same length.
-        .map(|block| utils::add_padding(block, key.len()))
-        // First xor the block with previously encrypted ciphertext block. next xor the block with the key
-        .flat_map(|block| {
-            let block_to_encrypt = utils::bytes_xor(&block, &previous_encrypted_block);
-            let ciphertext_block = utils::bytes_xor(&block_to_encrypt, key);
-            // The current ciphertext block becomes the previous for the next iteration.
-            previous_encrypted_block = ciphertext_block.to_vec();
-            ciphertext_block
-        })
-        .collect())
+    padded.chunks(16).for_each(|block| {
+        let xored: Vec<u8> = block.iter().zip(iv.iter()).map(|(a, b)| a ^ b).collect();
+        let mut buf = GenericArray::clone_from_slice(&xored);
+        cipher.encrypt_block(&mut buf);
+        iv.copy_from_slice(&buf);
+        result.extend(buf);
+    });
+
+    Ok(result)
 }
 
-/// For decrypting, we use te same steps as the encryption function, only reversed.
-/// WARN: The IV and padding scheme used in this function are not secure, this function should not
-/// be used in practice.
-pub fn decrypt_aes128_cbc_mode(data: &[u8], key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    // Function to remove padding if needed.
-    fn remove_padding(slice: &[u8]) -> &[u8] {
-        // Count the number of repeating bytes at the end of the slice
-        let n_repeating_end = slice
-            .iter()
-            .rev()
-            .take_while(|&n| *n == slice[slice.len() - 1])
-            .count();
-        // Return the slice without the repeating bytes *as a reference*
-        &slice[0..slice.len() - n_repeating_end]
+/// Decrypt with AES-128 in CBC mode
+pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8; 16]) -> Result<Vec<u8>> {
+    if data.len() % 16 != 0 {
+        return Err(anyhow!("ciphertext length must be a multiple of 16"));
     }
-    // Encrypted data must be a multiple of key length
-    if data.len() % key.len() != 0 {
-        return Err(anyhow!("data length not multiple of key length"));
-    }
-    // Create the IV
-    let mut previous_ciphertext_block = vec![0u8; key.len()];
-    // For every block, xor with key to decrypt, then xor it with the previous block to get the
-    // plaintext block.
-    let result: Vec<u8> = data
-        .chunks(key.len())
-        .flat_map(|block| {
-            // Decrypt the current block
-            let decrypted_block = utils::bytes_xor(block, key);
-            // XOR the decrypted block with the previous ciphertext block
-            let plaintext_block = utils::bytes_xor(&decrypted_block, &previous_ciphertext_block);
-            // The current ciphertext block becomes the previous for the next iteration
-            previous_ciphertext_block = block.to_vec();
-            plaintext_block
-        })
-        .collect();
 
-    // Remove padding from the last block
-    Ok(remove_padding(&result).to_vec())
+    let cipher = Aes128::new(GenericArray::from_slice(key));
+    let mut result = Vec::with_capacity(data.len());
+
+    data.chunks(16).for_each(|block| {
+        let mut buf = GenericArray::clone_from_slice(block);
+        cipher.decrypt_block(&mut buf);
+        let plain: Vec<u8> = buf.iter().zip(iv.iter()).map(|(a, b)| a ^ b).collect();
+        iv.copy_from_slice(block);
+        result.extend(plain);
+    });
+
+    Ok(unpad_pkcs7(result))
+}
+
+/// Encrypt with AES-128 in ECB mode
+pub fn encrypt_aes128_ecb(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>> {
+    let cipher = Aes128::new(GenericArray::from_slice(key));
+    let padded = pad_pkcs7(data);
+    let mut result = Vec::with_capacity(padded.len());
+
+    padded.chunks(16).for_each(|block| {
+        let mut buf = GenericArray::clone_from_slice(block);
+        cipher.encrypt_block(&mut buf);
+        result.extend(buf);
+    });
+
+    Ok(result)
+}
+
+/// Decrypt with AES-128 in ECB mode
+pub fn decrypt_aes128_ecb(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>> {
+    if data.len() % 16 != 0 {
+        return Err(anyhow!("ciphertext length must be a multiple of 16"));
+    }
+
+    let cipher = Aes128::new(GenericArray::from_slice(key));
+    let mut result = Vec::with_capacity(data.len());
+
+    data.chunks(16).for_each(|block| {
+        let mut buf = GenericArray::clone_from_slice(block);
+        cipher.decrypt_block(&mut buf);
+        result.extend(buf);
+    });
+
+    Ok(unpad_pkcs7(result))
 }
 
 #[test]
 fn test_aes128_cbc_mode() -> Result<(), anyhow::Error> {
     const LOREM: &str = include_str!("../data/lorem_ipsum.txt");
-    const KEY: &str = "YELLOW SUBMARINE";
+    const KEY: &[u8; 16] = b"YELLOW SUBMARINE";
+    const IV: &[u8; 16] = b"0000000000000000";
 
-    let encrypted = encrypt_aes128_cbc_mode(LOREM.as_bytes(), KEY.as_bytes()).unwrap();
-    let result = decrypt_aes128_cbc_mode(&encrypted, KEY.as_bytes()).unwrap();
-    if result != LOREM.as_bytes() {
-        return Err(anyhow!("unexpected result"));
-    }
+    let encrypted = encrypt_aes128_cbc(LOREM.as_bytes(), KEY, &mut IV.clone())?;
+    let result = decrypt_aes128_cbc(&encrypted, KEY, &mut IV.clone())?;
+    utils::require_eq(result.as_slice(), LOREM.as_bytes())?;
     Ok(())
 }
 
 #[test]
 fn test_aes128_ecb_mode() -> Result<(), anyhow::Error> {
     const LOREM: &str = include_str!("../data/lorem_ipsum.txt");
-    const KEY: &str = "YELLOW SUBMARINE";
-    let encrypted = encrypt_aes128_ecb_mode(LOREM.as_bytes(), KEY.as_bytes());
-    let result = decrypt_aes128_ecb_mode(&encrypted, KEY.as_bytes())?;
-    if result != LOREM.as_bytes() {
-        return Err(anyhow!("unexpected result"));
-    }
+    const KEY: &[u8; 16] = b"YELLOW SUBMARINE";
+    let encrypted = encrypt_aes128_ecb(LOREM.as_bytes(), KEY)?;
+    let result = decrypt_aes128_ecb(&encrypted, KEY)?;
+    utils::require_eq(result.as_slice(), LOREM.as_bytes())?;
     Ok(())
 }
