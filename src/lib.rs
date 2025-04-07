@@ -6,6 +6,7 @@ mod single_byte_xor;
 mod traits;
 mod types;
 mod utils;
+mod aes;
 
 use traits::{
     BytesBase64Ext, BytesExt, BytesHexExt, BytesHexLinesExt as _, BytesStrExt,

@@ -2,6 +2,12 @@
 use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
 
+pub fn bytes_xor_in_place(left: &mut [u8], right: &[u8]) {
+    left.iter_mut()
+        .zip(right.iter().cycle())
+        .for_each(|(l, r)| *l ^= *r);
+}
+
 pub fn bytes_xor(left: &[u8], right: &[u8]) -> Vec<u8> {
     left.iter()
         .zip(right.iter().cycle())
