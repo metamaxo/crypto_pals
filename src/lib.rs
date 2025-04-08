@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
-
 use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
+use rand::Rng;
+use std::collections::HashMap;
 mod aes_128;
 mod challenge_11;
 mod repeated_xor;
@@ -171,6 +172,45 @@ fn challenge_10() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+fn challenge_11() {
+    //Encrypt using a random key, append 5-10 bytes(count chosen randomly) before and after the
+    //plaintext. use ECB 1/2 of the time, use CBC the other half(using random IV's).
+    fn random_encryption<const BYTES: usize>(data: &[u8]) -> (&str, Vec<u8>) {
+        //Add random bytes before and after the plaintext.
+        let mut plaintext = utils::random_byte_vec();
+        plaintext.extend_from_slice(data);
+        plaintext.extend_from_slice(&utils::random_byte_vec());
+        //Generate random 16 byte key and iv,
+        let key = utils::generate_16_byte_key();
+        let mut iv = utils::generate_16_byte_key();
+        //encrypt chunks with random encryption method. returning encryption method so we can check our
+        //result when testing the method detection function.
+        match rand::rng().random_range(0..2) {
+            1 => ("ebc", aes_128::encrypt_aes128_ecb(data, &key).unwrap()),
+            _ => (
+                "cbc",
+                aes_128::encrypt_aes128_cbc(data, &key, &mut iv).unwrap(),
+            ),
+        }
+    }
+    const DATA: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    let (expected, cipher) = random_encryption::<16>(DATA.as_bytes());
+    //This detection mode only works when the encrypted plaintext is a string of identical bytes.
+    //Because ebc uses a the same key to encrypt each block, the amound of identical bytes in the
+    //ciphertext will be significantly higher. This means when we add every byte to a hashmap, the
+    //length of the hashmap will be shorter for ebc mode.
+    let mut counts = HashMap::new();
+    for byte in &cipher {
+        *counts.entry(byte).or_insert(0) += 1;
+    }
+    let uniqueness: f64 = (counts.len() as f64) / (cipher.len() as f64);
+    println!("uniqueness: {uniqueness}, mode: {expected}");
+    if uniqueness < 0.8 {
+        assert_eq!(expected, "ebc");
+    } else {
+        assert_eq!(expected, "cbc")
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -219,5 +259,9 @@ mod tests {
     #[test]
     fn challenge_10_test() -> Result<(), anyhow::Error> {
         challenge_10()
+    }
+    #[test]
+    fn challenge_11_test() {
+        challenge_11();
     }
 }

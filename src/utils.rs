@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
 use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
+use rand::Rng;
 
 pub fn bytes_xor_in_place(left: &mut [u8], right: &[u8]) {
     left.iter_mut()
@@ -24,18 +25,6 @@ pub fn slice_hamming(left: &[u8], right: &[u8]) -> u32 {
         .zip(right)
         .map(|(left, right)| compute_hamming(*left, *right))
         .sum()
-}
-
-#[test]
-fn test_slice_hamming() -> Result<(), anyhow::Error> {
-    const FILE: &str = "this is a test";
-    const RIGHT: &str = "wokka wokka!!!";
-    const EXPECTED: u32 = 37;
-    let hemming = crate::utils::slice_hamming(FILE.as_bytes(), RIGHT.as_bytes());
-    if hemming != EXPECTED {
-        return Err(anyhow!("unexpected result"));
-    }
-    Ok(())
 }
 
 pub fn alphabet_index(c: char) -> usize {
@@ -127,6 +116,20 @@ pub fn add_padding(data: &[u8], length: usize) -> Vec<u8> {
     result
 }
 
+pub fn random_byte_vec() -> Vec<u8> {
+    (0..rand::rng().random_range(5..10))
+        .map(|_| random_byte())
+        .collect()
+}
+
+pub fn random_byte() -> u8 {
+    rand::rng().random_range(33..126) as u8
+}
+
+pub fn generate_16_byte_key() -> Vec<u8> {
+    (0..16).map(|_| random_byte()).collect::<Vec<u8>>()
+}
+
 #[test]
 pub fn test_add_padding() {
     const INPUT: &[u8] = b"YELLOW SUBMARINE";
@@ -141,6 +144,19 @@ pub fn test_add_padding() {
     assert_eq!(&add_padding(INPUT, 23).len(), &23);
 }
 
+#[test]
+fn test_slice_hamming() -> Result<(), anyhow::Error> {
+    const FILE: &str = "this is a test";
+    const RIGHT: &str = "wokka wokka!!!";
+    const EXPECTED: u32 = 37;
+    let hemming = crate::utils::slice_hamming(FILE.as_bytes(), RIGHT.as_bytes());
+    if hemming != EXPECTED {
+        return Err(anyhow!("unexpected result"));
+    }
+    Ok(())
+}
+
+#[test]
 pub fn test_english_frequency() -> Result<(), anyhow::Error> {
     const SHORT_ENGLISH: &str = "hello";
     const LONG_GIBBERISH: &str = "djkaf;dskaj;eolajek;auipubiaujdfai;jea'rejajreiahgkda;jbkfjakdlfja;jeklwq;urti32u5iou643612j3jlkdja; ekjalek;jke;ajreial;rejk";
@@ -152,4 +168,11 @@ pub fn test_english_frequency() -> Result<(), anyhow::Error> {
         short_english_score > long_gibberish_score,
         "unexpected result",
     )
+}
+#[test]
+fn generate_key_test() {
+    const EXCEPTED_LENGTH: usize = 16;
+    let key = generate_16_byte_key();
+    println!("{:?}", String::from_utf8_lossy(&key));
+    assert_eq!(key.len(), EXCEPTED_LENGTH);
 }
