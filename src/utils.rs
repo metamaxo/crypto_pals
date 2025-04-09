@@ -137,7 +137,7 @@ pub fn generate_16_byte_key() -> Vec<u8> {
 //Because ebc uses a the same key to encrypt each block, the amound of identical bytes in the
 //ciphertext will be significantly higher. This means when we add every byte to a hashmap, the
 //length of the hashmap will be shorter for ebc mode.
-fn detect_encryption_mode(cipher: Vec<u8>) -> String {
+pub fn detect_encryption_mode(cipher: Vec<u8>) -> String {
     let mut counts = HashMap::new();
     for byte in &cipher {
         *counts.entry(byte).or_insert(0) += 1;
@@ -152,7 +152,7 @@ fn detect_encryption_mode(cipher: Vec<u8>) -> String {
 
 // Create a byte dictionary for every possible byte making sure its encrypted so we can compare
 // it later.
-fn generate_aes_byte_dictionary(key: &[u8]) -> Result<HashMap<Vec<u8>, String>, anyhow::Error> {
+pub fn generate_aes_byte_dictionary(key: &[u8]) -> Result<HashMap<Vec<u8>, String>, anyhow::Error> {
     Ok((0..=255)
         .map(|i| {
             let mut k = vec![b'A'; 15];

@@ -1,4 +1,7 @@
-use crate::{aes_128, utils::generate_16_byte_key};
+use crate::{
+    aes_128,
+    utils::{self, generate_16_byte_key},
+};
 use anyhow::{Error, anyhow};
 use std::collections::HashMap;
 
@@ -16,7 +19,7 @@ fn dict_from_string(data: &str) -> HashMap<String, String> {
         .collect()
 }
 
-// Parse object and produce a string
+// Parse HashMap and produce a string
 fn string_from_dict(dict: HashMap<String, String>) -> String {
     dict.iter()
         .map(|(k, v)| format!("{}={}", k, v))
@@ -24,13 +27,10 @@ fn string_from_dict(dict: HashMap<String, String>) -> String {
         .join("&")
 }
 
-// Checks email length, if it ends with a top lever domain name and if it conains unwanted symbols
-// before producing a profile object in string form.
+// Checks email length and if it contains unwanted characters before producing
+// a profile in string form.
 fn profile_for(email_adress: &str) -> Result<String, anyhow::Error> {
-    if email_adress.len() >= 4
-        && email_adress[(email_adress.len() - 4)..(email_adress.len() - 2)].contains(".")
-        && !email_adress.contains(['&', '='])
-    {
+    if email_adress.len() >= 4 && !email_adress.contains(['&', '=']) {
         let profile = HashMap::from([
             ("email".to_string(), email_adress.to_string()),
             ("uid".to_string(), "10".to_string()),
@@ -43,9 +43,13 @@ fn profile_for(email_adress: &str) -> Result<String, anyhow::Error> {
 }
 
 // The oracle produces an ecb encrypted profile.
-fn profile_for_oracle(email: &str, key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    aes_128::encrypt_aes128_ecb(profile_for(email)?.as_bytes(), key)
+fn profile_for_oracle(email: &str) -> Result<Vec<u8>, anyhow::Error> {
+    let key: Vec<u8> = vec![
+        119, 120, 57, 66, 93, 72, 89, 114, 103, 91, 105, 56, 79, 51, 84, 80,
+    ];
+    aes_128::encrypt_aes128_ecb(profile_for(email)?.as_bytes(), &key)
 }
+
 // Decrypts the cipher and checks the current role.
 fn oracle_role(cipher: &[u8], key: &[u8]) -> Result<String, anyhow::Error> {
     let plaintext = aes_128::decrypt_aes128_ecb(cipher, key)?;
@@ -57,19 +61,45 @@ fn oracle_role(cipher: &[u8], key: &[u8]) -> Result<String, anyhow::Error> {
 }
 
 // Generate a random AES key.
-// -Encrypt the encoded user profile under the key; "provide" that to the "attacker".
-// -Decrypt the encoded user profile and parse it.
 // Using only the user input to profile_for() (as an oracle to generate "valid" ciphertexts) and the ciphertexts themselves, make a role=admin profile.
 fn challenge_13() -> Result<(), anyhow::Error> {
     const USER_EMAIL: &str = "foo@bar.com";
     let key: Vec<u8> = vec![
         119, 120, 57, 66, 93, 72, 89, 114, 103, 91, 105, 56, 79, 51, 84, 80,
     ];
-    // We get the encrypted profile from the oracle, now we have to change our role to admin.
-    let cipher = profile_for_oracle(USER_EMAIL, &key)?;
+    fn first_loop(email: &str, key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+        loop {
+            let cipher = profile_for_oracle(email)?;
+            let plaintext = aes_128::decrypt_aes128_ecb(&cipher, key)?.to_vec();
+            if &plaintext[(plaintext.len() - 4)..] == b"user" {
+                break Ok(cipher);
+            }
+        }
+    }
+    fn second_loop(email: &str, key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+        loop {
+            let cipher = profile_for_oracle(email)?;
+            let plaintext = aes_128::decrypt_aes128_ecb(&cipher, key)?.to_vec();
+            if &plaintext[(plaintext.len() - 5)..] == b"admin" {
+                break Ok(cipher);
+            }
+        }
+    }
+    // Since the function uses a hashmap the result isnt going to be the same every time so we can
+    // play with the variations. i've found the following email adresses / variations might work:
+    let email_1 = "fooo@baar.com"; // email=foo@baaar. com&uid=10&role= user
+    let email_2 = "fooo@baa.admin"; // role=user&uid=10 email=fooo@baaa. admin
+    // Now that we have the email adresses lets get the ciphers
+    let first_break_cipher = first_loop(email_1, &key)?;
+    let second_break_cipher = second_loop(email_2, &key)?;
+    // we need the first 2 blocks from the first break cipher, and the last block from the second
+    // break cipher
+    let mut break_cipher = first_break_cipher[0..32].to_vec();
+    break_cipher.extend_from_slice(&second_break_cipher[32..]);
+    // The break cipher gives us the following profile: uid=10&email=fooo@baar.com&role=admin.
     // We send the cipher back to the oracle and check our current role
-    let role = oracle_role(&cipher, &key);
-    println!("role: {:?}", role);
+    let role = oracle_role(&break_cipher, &key)?;
+    assert_eq!(role, "admin");
     Ok(())
 }
 
