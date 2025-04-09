@@ -1,7 +1,11 @@
 #![allow(dead_code, unused_imports)]
+use std::collections::HashMap;
+
 use anyhow::anyhow;
 use base64::{Engine as _, engine::general_purpose};
 use rand::Rng;
+
+use crate::aes_128;
 
 pub fn bytes_xor_in_place(left: &mut [u8], right: &[u8]) {
     left.iter_mut()
@@ -128,6 +132,39 @@ pub fn random_byte() -> u8 {
 
 pub fn generate_16_byte_key() -> Vec<u8> {
     (0..16).map(|_| random_byte()).collect::<Vec<u8>>()
+}
+//This detection mode only works when the encrypted plaintext is a string of identical bytes.
+//Because ebc uses a the same key to encrypt each block, the amound of identical bytes in the
+//ciphertext will be significantly higher. This means when we add every byte to a hashmap, the
+//length of the hashmap will be shorter for ebc mode.
+fn detect_encryption_mode(cipher: Vec<u8>) -> String {
+    let mut counts = HashMap::new();
+    for byte in &cipher {
+        *counts.entry(byte).or_insert(0) += 1;
+    }
+    let uniqueness: f64 = (counts.len() as f64) / (cipher.len() as f64);
+    if uniqueness < 0.8 {
+        "ebc".to_owned()
+    } else {
+        "cbc".to_owned()
+    }
+}
+
+// Create a byte dictionary for every possible byte making sure its encrypted so we can compare
+// it later.
+fn generate_aes_byte_dictionary(key: &[u8]) -> Result<HashMap<Vec<u8>, String>, anyhow::Error> {
+    Ok((0..=255)
+        .map(|i| {
+            let mut k = vec![b'A'; 15];
+            let byte = i as u8;
+            k.push(byte);
+            let encrypted_k = aes_128::encrypt_aes128_ecb(&k, key).unwrap();
+            (
+                encrypted_k[0..16].to_vec(),
+                String::from_utf8_lossy(&[byte]).to_string(),
+            )
+        })
+        .collect())
 }
 
 #[test]
