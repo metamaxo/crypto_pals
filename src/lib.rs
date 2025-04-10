@@ -4,6 +4,7 @@ use rand::Rng;
 use std::collections::HashMap;
 mod aes_128;
 mod challenge_13;
+mod challenge_14;
 mod repeated_xor;
 mod single_byte_xor;
 mod traits;
@@ -299,7 +300,6 @@ fn challenge_12() -> Result<(), anyhow::Error> {
     // Generate byte dictionary and short string. We will use this to try break the encryption.
     let byte_dictionary = generate_byte_dictionary(&key);
     let short_string = (0..15).map(|_| b'A').collect::<Vec<u8>>();
-
     // We will append the unknown string to the short string, resulting in a block with 15 known bytes,
     // and the first byte of the unknown string.
     let result: Vec<String> = (0..unknown_string.len())
