@@ -6,7 +6,7 @@ use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use anyhow::{Result, anyhow};
 
 /// Pad using PKCS#7
-fn pad_pkcs7(data: &[u8]) -> Vec<u8> {
+pub fn pad_pkcs7(data: &[u8]) -> Vec<u8> {
     let pad_len = 16 - (data.len() % 16);
     data.iter()
         .cloned()
@@ -15,7 +15,7 @@ fn pad_pkcs7(data: &[u8]) -> Vec<u8> {
 }
 
 /// Remove PKCS#7 padding
-fn unpad_pkcs7(mut data: Vec<u8>) -> Vec<u8> {
+pub fn unpad_pkcs7(mut data: Vec<u8>) -> Vec<u8> {
     if let Some(&pad) = data.last() {
         let len = data.len();
         if (pad as usize) <= len && data[len - pad as usize..].iter().all(|&b| b == pad) {
@@ -25,7 +25,7 @@ fn unpad_pkcs7(mut data: Vec<u8>) -> Vec<u8> {
     data
 }
 /// Verify PKCS#7 padding
-fn verify_pkcs7(data: &[u8]) -> bool {
+pub fn verify_pkcs7(data: &[u8]) -> bool {
     if let Some(&pad) = data.last() {
         let pad_usize = pad as usize;
         if pad_usize > 0 && pad_usize <= data.len() && data.len() % 16 == 0 {
@@ -53,7 +53,7 @@ pub fn encrypt_aes128_cbc(data: &[u8], key: &[u8], iv: &mut [u8]) -> Result<Vec<
 }
 
 /// Decrypt with AES-128 in CBC mode
-pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8; 16], iv: &mut [u8]) -> Result<Vec<u8>> {
+pub fn decrypt_aes128_cbc(data: &[u8], key: &[u8], iv: &mut [u8]) -> Result<Vec<u8>> {
     if data.len() % 16 != 0 {
         return Err(anyhow!("ciphertext length must be a multiple of 16"));
     }

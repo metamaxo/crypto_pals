@@ -3,7 +3,7 @@ use base64::{Engine, engine as _, engine::general_purpose::STANDARD};
 use rand::Rng;
 use std::collections::HashMap;
 mod aes_128;
-mod challenge_15;
+mod challenge_16;
 mod repeated_xor;
 mod single_byte_xor;
 mod traits;
